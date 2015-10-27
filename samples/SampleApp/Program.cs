@@ -22,6 +22,7 @@ namespace SampleApp
             factory.AddEventLog();
 #endif
             factory.AddConsole(includeScopes: true);
+            factory.AddDebug(includeScopes: true);
         }
 
         public void Main(string[] args)

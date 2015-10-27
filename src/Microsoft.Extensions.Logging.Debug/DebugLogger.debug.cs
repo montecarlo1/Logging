@@ -10,9 +10,14 @@ namespace Microsoft.Extensions.Logging.Debug
 {
     public partial class DebugLogger
     {
-        private void DebugWriteLine(string message, string name)
+        private void DebugWrite(string message)
         {
-            System.Diagnostics.Debug.WriteLine(message, name);
+            System.Diagnostics.Debug.Write(message);
+        }
+
+        private void DebugWriteLine(string message)
+        {
+            System.Diagnostics.Debug.WriteLine(message);
         }
     }
 }

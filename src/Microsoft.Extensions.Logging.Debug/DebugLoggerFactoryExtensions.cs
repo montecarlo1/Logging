@@ -21,13 +21,37 @@ namespace Microsoft.Extensions.Logging
         }
 
         /// <summary>
+        /// Adds a debug logger that is enabled for <see cref="LogLevel"/>.Information or higher.
+        /// </summary>
+        /// <param name="factory">The extension method argument.</param>
+        /// <param name="includeScopes"></param>
+        public static ILoggerFactory AddDebug(this ILoggerFactory factory, bool includeScopes)
+        {
+            return AddDebug(factory, LogLevel.Information, includeScopes);
+        }
+
+        /// <summary>
         /// Adds a debug logger that is enabled as defined by the filter function.
         /// </summary>
         /// <param name="factory">The extension method argument.</param>
         /// <param name="filter">The function used to filter events based on the log level.</param>
         public static ILoggerFactory AddDebug(this ILoggerFactory factory, Func<string, LogLevel, bool> filter)
         {
-            factory.AddProvider(new DebugLoggerProvider(filter));
+            factory.AddDebug(filter, includeScopes: false);
+            return factory;
+        }
+
+        /// <summary>
+        /// Adds a debug logger that is enabled as defined by the filter function.
+        /// </summary>
+        /// <param name="factory">The extension method argument.</param>
+        /// <param name="filter">The function used to filter events based on the log level.</param>
+        public static ILoggerFactory AddDebug(
+            this ILoggerFactory factory,
+            Func<string, LogLevel, bool> filter,
+            bool includeScopes)
+        {
+            factory.AddProvider(new DebugLoggerProvider(filter, includeScopes));
             return factory;
         }
 
@@ -41,6 +65,20 @@ namespace Microsoft.Extensions.Logging
             return AddDebug(
                factory,
                (_, logLevel) => logLevel >= minLevel);
+        }
+
+        /// <summary>
+        /// Adds a debug logger that is enabled for <see cref="LogLevel"/>s of minLevel or higher.
+        /// </summary>
+        /// <param name="factory">The extension method argument.</param>
+        /// <param name="minLevel">The minimum <see cref="LogLevel"/> to be logged</param>
+        /// <param name="includeScopes"></param>
+        public static ILoggerFactory AddDebug(this ILoggerFactory factory, LogLevel minLevel, bool includeScopes)
+        {
+            return AddDebug(
+               factory,
+               (_, logLevel) => logLevel >= minLevel,
+               includeScopes);
         }
     }
 }

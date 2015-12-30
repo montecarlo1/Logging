@@ -22,9 +22,5 @@ namespace Microsoft.Extensions.Logging.Test
         public void AddProvider(ILoggerProvider provider)
         {
         }
-
-        public void Dispose()
-        {
-        }
     }
 }

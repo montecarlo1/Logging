@@ -15,7 +15,6 @@ namespace Microsoft.Extensions.Logging
         private readonly Dictionary<string, Logger> _loggers = new Dictionary<string, Logger>(StringComparer.Ordinal);
         private ILoggerProvider[] _providers = new ILoggerProvider[0];
         private readonly object _sync = new object();
-        private bool _disposed = false;
 
         public ILogger CreateLogger(string categoryName)
         {
@@ -46,26 +45,6 @@ namespace Microsoft.Extensions.Logging
         internal ILoggerProvider[] GetProviders()
         {
             return _providers;
-        }
-
-        public void Dispose()
-        {
-            if (!_disposed)
-            {
-                foreach (var provider in _providers)
-                {
-                    try
-                    {
-                        provider.Dispose();
-                    }
-                    catch
-                    {
-                        // Swallow exceptions on dispose
-                    }
-                }
-
-                _disposed = true;
-            }
         }
     }
 }

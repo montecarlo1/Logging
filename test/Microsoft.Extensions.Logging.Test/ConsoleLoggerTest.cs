@@ -103,7 +103,7 @@ namespace Microsoft.Extensions.Logging.Test
             var expectedMessage =
                 _paddingString + message + Environment.NewLine;
             var expectedExceptionMessage =
-                _paddingString + exception.Message + Environment.NewLine;
+                _paddingString + exception.ToString() + Environment.NewLine;
 
             // Act
             logger.LogCritical(eventId, exception, message);
@@ -712,7 +712,7 @@ namespace Microsoft.Extensions.Logging.Test
                 loglevelStringWithPadding + $"{_loggerName}[{eventId}]" + Environment.NewLine
                 + _paddingString + ReplaceMessageNewLinesWithPadding(_state.ToString())
                 + Environment.NewLine + _paddingString + exception.GetType().FullName + Environment.NewLine + _paddingString
-                + ReplaceMessageNewLinesWithPadding(exception.Message) + Environment.NewLine;
+                + ReplaceMessageNewLinesWithPadding(exception.ToString()) + Environment.NewLine;
         }
 
         private string ReplaceMessageNewLinesWithPadding(string message)

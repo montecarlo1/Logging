@@ -172,7 +172,7 @@ namespace Microsoft.Extensions.Logging.Console
 
         private void WriteException(LogLevel logLevel, string logName, int eventId, Exception ex)
         {
-            var message = ReplaceMessageNewLinesWithPadding(ex.Message);
+            var message = ReplaceMessageNewLinesWithPadding(ex.ToString());
             var logLevelColors = GetLogLevelConsoleColors(logLevel);
             var loglevelString = GetLogLevelString(logLevel);
 

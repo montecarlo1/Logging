@@ -5,8 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Tracing;
 using System.Globalization;
-using System.Reflection;
-using System.Reflection.Metadata;
+
+using Microsoft.Extensions.Logging.Internal;
 
 namespace Microsoft.Extensions.Logging.EventSource
 {
@@ -48,22 +48,48 @@ namespace Microsoft.Extensions.Logging.EventSource
         /// Gets the values of all primitive, string and Guid properties of the passed state object
         /// </summary>
         /// <param name="state">State object to be examined</param>
+        /// <param name="formatProvider"></param>
+        /// <param name="message"></param>
+        /// <param name="keywords">Event keywords extracted from the state</param>
         /// <returns>A dictionary of property values indexed by property name</returns>
-        public static IDictionary<string, object> GetPrimitiveStateData(object state)
+        /// <remarks>Value extraction will be attempted only if the passed state is a FormattedLogValues instance, otherwise the returned dictionary will be empty</remarks>
+        public static IDictionary<string, string> GetPrimitiveStateData(object state, IFormatProvider formatProvider, string message, out EventKeywords keywords)
         {
+            keywords = EventKeywords.None;
+
             if (state == null)
             {
                 return null;
             }
 
-            var result = new Dictionary<string, object>();
+            var result = new Dictionary<string, string>();
 
-            foreach (PropertyInfo p in state.GetType().GetProperties())
+            var logValues = state as FormattedLogValues;
+            if (logValues == null)
             {
-                if (p.PropertyType == typeof(string) || p.PropertyType.GetTypeInfo().IsPrimitive || p.PropertyType == typeof(Guid))
+                return result;
+            }
+
+            foreach(KeyValuePair<string, object> kvPair in logValues)
+            {
+                if ("Keywords".Equals(kvPair.Key, StringComparison.OrdinalIgnoreCase) && kvPair.Value != null && kvPair.Value is EventKeywords)
                 {
-                    result[p.Name] = p.GetValue(state);
+                    keywords = (EventKeywords)kvPair.Value;
                 }
+
+                string formatString = "{0}";
+                if (kvPair.Value is DateTime || kvPair.Value is DateTimeOffset)
+                {
+                    formatString = "{0:o}"; // Ensure that we use use ISO 8601 time format
+                }
+
+                string serializedValue = kvPair.Value == null ? string.Empty : string.Format(formatProvider, formatString, kvPair.Value);
+                result.Add(kvPair.Key, serializedValue);
+            }
+
+            if (message != null)
+            {
+                result.Add("Message", message);
             }
 
             return result;

@@ -13,8 +13,7 @@
         "Microsoft.Extensions.Logging.Abstractions": "1.0.0-*"
     },
 
-    "frameworks": {
-        "net451": { },
+    "frameworks": {        
         "dotnet5.4": {            
             "dependencies": {
                 

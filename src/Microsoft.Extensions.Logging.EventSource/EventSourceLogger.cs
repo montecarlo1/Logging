@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Tracing;
+using System.Globalization;
 
 namespace Microsoft.Extensions.Logging.EventSource
 {
@@ -30,6 +31,7 @@ namespace Microsoft.Extensions.Logging.EventSource
         private readonly string _name;
         private readonly EventSourceLoggerSettings _settings;
         private System.Diagnostics.Tracing.EventSource _eventSource;
+        private IFormatProvider _formatProvider;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventSourceLogger"/> class.
@@ -50,6 +52,7 @@ namespace Microsoft.Extensions.Logging.EventSource
             _name = string.IsNullOrEmpty(name) ? nameof(EventSourceLogger) : name;
             _settings = settings;
             _eventSource = new System.Diagnostics.Tracing.EventSource(_settings.EventSourceName);
+            _formatProvider = _settings.FormatProvider == null ? CultureInfo.CurrentCulture : _settings.FormatProvider;
         }
 
         /// <inheritdoc />
@@ -70,99 +73,36 @@ namespace Microsoft.Extensions.Logging.EventSource
             EventId eventId,
             TState state,
             Exception exception,
-            Func<TState, Exception, string> formatter)
+            Func<TState, Exception, string> messageFormatter)
         {
             if (logLevel == LogLevel.None || !IsEnabled(logLevel))
             {
                 return;
             }
 
-            if (formatter == null)
+            if (messageFormatter == null)
             {
-                throw new ArgumentNullException(nameof(formatter));
+                throw new ArgumentNullException(nameof(messageFormatter));
             }
 
             string eventName;
             EventOpcode opCode;
             Conventions.GetEventNameAndOpCode(eventId, out eventName, out opCode);
 
-            IDictionary<string, object> stateData = Conventions.GetPrimitiveStateData(state);
+            string message = messageFormatter(state, exception);
 
-            EventLevel eventLevel = EventSourceLogger.LogLevel2EventLevel[logLevel];
+            EventKeywords keywords;
+            IDictionary<string, string> dataBag = Conventions.GetPrimitiveStateData(state, _formatProvider, message, out keywords);
 
-            EventKeywords keywords = EventKeywords.None;
-            object candidateKeywords;
-            if (stateData.TryGetValue("Keywords", out candidateKeywords) && candidateKeywords.GetType().IsEnum)
+            EventLevel eventLevel = EventSourceLogger.LogLevel2EventLevel[logLevel];            
+
+            EventSourceOptions eventOptions = new EventSourceOptions
             {
-                keywords = (EventKeywords) candidateKeywords;
-            }
-
-            string message = formatter(state, exception);
-            _eventSource.Write()
-        }
-
-        // category '0' translates to 'None' in event log
-        private void WriteMessage(string message, int eventId)
-        {
-
-            //if (message.Length <= EventLog.MaxMessageSize)
-            //{
-            //    EventLog.WriteEntry(message, eventLogEntryType, eventId, category: 0);
-            //    return;
-            //}
-
-            //var startIndex = 0;
-            //string messageSegment = null;
-            //while (true)
-            //{
-            //    // Begin segment
-            //    // Example: An error occu...
-            //    if (startIndex == 0)
-            //    {
-            //        messageSegment = message.Substring(startIndex, _beginOrEndMessageSegmentSize) + ContinuationString;
-            //        startIndex += _beginOrEndMessageSegmentSize;
-            //    }
-            //    else
-            //    {
-            //        // Check if rest of the message can fit within the maximum message size
-            //        // Example: ...esponse stream
-            //        if ((message.Length - (startIndex + 1)) <= _beginOrEndMessageSegmentSize)
-            //        {
-            //            messageSegment = ContinuationString + message.Substring(startIndex);
-            //            EventLog.WriteEntry(messageSegment, eventLogEntryType, eventId, category: 0);
-            //            break;
-            //        }
-            //        else
-            //        {
-            //            // Example: ...rred while writ...
-            //            messageSegment =
-            //                ContinuationString
-            //                + message.Substring(startIndex, _intermediateMessageSegmentSize)
-            //                + ContinuationString;
-            //            startIndex += _intermediateMessageSegmentSize;
-            //        }
-            //    }
-
-            //    EventLog.WriteEntry(messageSegment, eventLogEntryType, eventId, category: 0);
-            //}
-        }
-
-        private EventLogEntryType GetEventLogEntryType(LogLevel level)
-        {
-            switch (level)
-            {
-                case LogLevel.Information:
-                case LogLevel.Debug:
-                case LogLevel.Trace:
-                    return EventLogEntryType.Information;
-                case LogLevel.Warning:
-                    return EventLogEntryType.Warning;
-                case LogLevel.Critical:
-                case LogLevel.Error:
-                    return EventLogEntryType.Error;
-                default:
-                    return EventLogEntryType.Information;
-            }
+                Keywords = keywords,
+                Level = eventLevel,
+                Opcode = opCode
+            };
+            _eventSource.Write(eventName, eventOptions, new { dataBag = dataBag });
         }
 
         private class NoopDisposable : IDisposable
@@ -171,7 +111,5 @@ namespace Microsoft.Extensions.Logging.EventSource
             {
             }
         }
-
-        
     }
 }

@@ -19,5 +19,10 @@ namespace Microsoft.Extensions.Logging.EventSource
         /// The function used to filter events based on the log level.
         /// </summary>
         public Func<string, LogLevel, bool> Filter { get; set; }
+
+        /// <summary>
+        /// The format provider used to format the data being logged.
+        /// </summary>
+        public IFormatProvider FormatProvider { get; set; }
     }
 }

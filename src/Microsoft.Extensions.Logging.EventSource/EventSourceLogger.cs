@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Tracing;
 using System.Globalization;
+using Newtonsoft.Json;
+using Microsoft.Extensions.Logging.EventSource.Internal;
 
 namespace Microsoft.Extensions.Logging.EventSource
 {
@@ -30,7 +32,9 @@ namespace Microsoft.Extensions.Logging.EventSource
 
         private readonly string _name;
         private readonly EventSourceLoggerSettings _settings;
+#if !NET451
         private System.Diagnostics.Tracing.EventSource _eventSource;
+#endif
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventSourceLogger"/> class.
@@ -50,12 +54,20 @@ namespace Microsoft.Extensions.Logging.EventSource
         {
             _name = string.IsNullOrEmpty(name) ? nameof(EventSourceLogger) : name;
             _settings = settings;
+#if NET451
+            if ((settings.DataFormat & LogDataFormat.PropertyBag) != 0)
+            {
+                throw new ArgumentException("Property bag data format is not supported with .NET Framework 4.5 series", nameof(settings));
+            }
+#else
             _eventSource = new System.Diagnostics.Tracing.EventSource(_settings.EventSourceName);
+#endif
         }
 
         /// <inheritdoc />
         public IDisposable BeginScopeImpl(object state)
         {
+            // TODO: better implementation using ETW activities 
             return new NoopDisposable();
         }
 
@@ -105,22 +117,24 @@ namespace Microsoft.Extensions.Logging.EventSource
             string message = messageFormatter(state, exception);
 
             EventKeywords keywords = EventKeywords.None;
-            IDictionary<string, string> dataBag = null;
+            IEnumerable<KeyValuePair<string, string>> dataBag = null;
 
             if ((_settings.DataFormat & LogDataFormat.PropertyBag) != 0)
             {
-                dataBag = Conventions.GetPrimitiveStateData(state, _settings.FormatProvider, message, out keywords);
+                dataBag = Conventions.GetDataBag(state, _settings.FormatProvider, message, exception, out keywords);
             }
+
+            string jsonData = GetJsonData(eventId, state, exception);
 
             EventLevel eventLevel = EventSourceLogger.LogLevel2EventLevel[logLevel];            
 
-            EventSourceOptions eventOptions = new EventSourceOptions
+            var eventOptions = new EventSourceOptions
             {
                 Keywords = keywords,
                 Level = eventLevel,
                 Opcode = opCode
             };
-            _eventSource.Write(eventName, eventOptions, new { dataBag = dataBag });
+            _eventSource.Write(eventName, eventOptions, new { data = dataBag, jsonData = jsonData });
         }
 #else
         private void LogImpl45<TState>(
@@ -130,8 +144,23 @@ namespace Microsoft.Extensions.Logging.EventSource
             Exception exception,
             Func<TState, Exception, string> messageFormatter)
         {
+            Debug.Assert((_settings.DataFormat & LogDataFormat.PropertyBag) == 0, "Property bag format is not supported with 4.5 framework series");
+
+            string jsonData = GetJsonData(state, exception);
         }
 #endif
+        private string GetJsonData<TState>(EventId eventId, TState state, Exception exception)
+        {
+            if ((_settings.DataFormat & LogDataFormat.JSON) != 0)
+            {
+                var data = new { id = eventId.Id, name = eventId.Name, state = state, exception = exception };
+                return JsonConvert.SerializeObject(data);
+            }
+            else
+            {
+                return null;
+            }
+        }
 
         private class NoopDisposable : IDisposable
         {

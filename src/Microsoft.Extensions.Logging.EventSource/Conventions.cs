@@ -7,8 +7,9 @@ using System.Diagnostics.Tracing;
 using System.Globalization;
 
 using Microsoft.Extensions.Logging.Internal;
+using System.Diagnostics;
 
-namespace Microsoft.Extensions.Logging.EventSource
+namespace Microsoft.Extensions.Logging.EventSource.Internal
 {
     internal static class Conventions
     {
@@ -48,33 +49,34 @@ namespace Microsoft.Extensions.Logging.EventSource
         /// Gets the values of all primitive, string and Guid properties of the passed state object
         /// </summary>
         /// <param name="state">State object to be examined</param>
-        /// <param name="formatProvider"></param>
-        /// <param name="message"></param>
+        /// <param name="formatProvider">The format provider to use for data serialization</param>
+        /// <param name="message">Event message</param>
+        /// <param name="exception">Exception associated with the event (if any)</param>
         /// <param name="keywords">Event keywords extracted from the state</param>
-        /// <returns>A dictionary of property values indexed by property name</returns>
-        /// <remarks>Value extraction will be attempted only if the passed state is a FormattedLogValues instance, otherwise the returned dictionary will be empty</remarks>
-        public static IDictionary<string, string> GetPrimitiveStateData(object state, IFormatProvider formatProvider, string message, out EventKeywords keywords)
+        /// <returns>A list of property name-value pairs</returns>
+        /// <remarks>Value extraction will be attempted only if the passed state is a FormattedLogValues instance, otherwise null will be returned</remarks>
+        public static IEnumerable<KeyValuePair<string, string>> GetDataBag(
+            object state, 
+            IFormatProvider formatProvider, 
+            string message, 
+            Exception exception, 
+            out EventKeywords keywords)
         {
             keywords = EventKeywords.None;
 
-            if (state == null)
+            var logValues = state as FormattedLogValues;
+            if (logValues == null)
             {
                 return null;
             }
 
             var result = new Dictionary<string, string>();
-
-            var logValues = state as FormattedLogValues;
-            if (logValues == null)
+            foreach (KeyValuePair<string, object> kvPair in logValues)
             {
-                return result;
-            }
-
-            foreach(KeyValuePair<string, object> kvPair in logValues)
-            {
-                if ("Keywords".Equals(kvPair.Key, StringComparison.OrdinalIgnoreCase) && kvPair.Value != null && kvPair.Value is EventKeywords)
+                EventKeywords tempKeywords;
+                if (TryExtractKeywords(kvPair, out tempKeywords))
                 {
-                    keywords = (EventKeywords)kvPair.Value;
+                    keywords = tempKeywords;
                 }
 
                 string formatString = "{0}";
@@ -87,12 +89,50 @@ namespace Microsoft.Extensions.Logging.EventSource
                 result.Add(kvPair.Key, serializedValue);
             }
 
-            if (message != null)
+            if (!string.IsNullOrEmpty(message))
             {
-                result.Add("Message", message);
+                result["Message"] = message;
+            }
+            if (exception != null)
+            {
+                result["Exception"] = exception.ToString();
             }
 
             return result;
+        }
+
+        public static EventKeywords GetKeywords(object state)
+        {
+            var logValues = state as FormattedLogValues;
+            if (logValues == null)
+            {
+                return EventKeywords.None;
+            }
+
+            foreach (KeyValuePair<string, object> kvPair in logValues)
+            {
+                EventKeywords keywords;
+                if (TryExtractKeywords(kvPair, out keywords))
+                {
+                    return keywords;
+                }
+            }
+
+            return EventKeywords.None;
+        }
+
+        private static bool TryExtractKeywords(KeyValuePair<string, object> kvPair, out EventKeywords keywords)
+        {
+            if ("Keywords".Equals(kvPair.Key, StringComparison.OrdinalIgnoreCase) && kvPair.Value != null && kvPair.Value is long)
+            {
+                keywords = (EventKeywords)kvPair.Value;
+                return true;
+            }
+            else
+            {
+                keywords = EventKeywords.None;
+                return false;
+            }
         }
     }
 }

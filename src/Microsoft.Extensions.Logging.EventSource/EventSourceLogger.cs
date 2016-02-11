@@ -31,7 +31,6 @@ namespace Microsoft.Extensions.Logging.EventSource
         private readonly string _name;
         private readonly EventSourceLoggerSettings _settings;
         private System.Diagnostics.Tracing.EventSource _eventSource;
-        private IFormatProvider _formatProvider;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventSourceLogger"/> class.
@@ -52,7 +51,6 @@ namespace Microsoft.Extensions.Logging.EventSource
             _name = string.IsNullOrEmpty(name) ? nameof(EventSourceLogger) : name;
             _settings = settings;
             _eventSource = new System.Diagnostics.Tracing.EventSource(_settings.EventSourceName);
-            _formatProvider = _settings.FormatProvider == null ? CultureInfo.CurrentCulture : _settings.FormatProvider;
         }
 
         /// <inheritdoc />
@@ -85,14 +83,34 @@ namespace Microsoft.Extensions.Logging.EventSource
                 throw new ArgumentNullException(nameof(messageFormatter));
             }
 
+#if !NET451
+            LogImplCore(logLevel, eventId, state, exception, messageFormatter);
+#else
+            LogImpl45(logLevel, eventId, state, exception, messageFormatter);
+#endif
+        }
+
+#if !NET451
+        private void LogImplCore<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception exception,
+            Func<TState, Exception, string> messageFormatter)
+        {
             string eventName;
             EventOpcode opCode;
             Conventions.GetEventNameAndOpCode(eventId, out eventName, out opCode);
 
             string message = messageFormatter(state, exception);
 
-            EventKeywords keywords;
-            IDictionary<string, string> dataBag = Conventions.GetPrimitiveStateData(state, _formatProvider, message, out keywords);
+            EventKeywords keywords = EventKeywords.None;
+            IDictionary<string, string> dataBag = null;
+
+            if ((_settings.DataFormat & LogDataFormat.PropertyBag) != 0)
+            {
+                dataBag = Conventions.GetPrimitiveStateData(state, _settings.FormatProvider, message, out keywords);
+            }
 
             EventLevel eventLevel = EventSourceLogger.LogLevel2EventLevel[logLevel];            
 
@@ -104,6 +122,16 @@ namespace Microsoft.Extensions.Logging.EventSource
             };
             _eventSource.Write(eventName, eventOptions, new { dataBag = dataBag });
         }
+#else
+        private void LogImpl45<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception exception,
+            Func<TState, Exception, string> messageFormatter)
+        {
+        }
+#endif
 
         private class NoopDisposable : IDisposable
         {

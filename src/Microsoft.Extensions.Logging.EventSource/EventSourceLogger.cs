@@ -32,9 +32,7 @@ namespace Microsoft.Extensions.Logging.EventSource
 
         private readonly string _name;
         private readonly EventSourceLoggerSettings _settings;
-#if !NET451
         private System.Diagnostics.Tracing.EventSource _eventSource;
-#endif
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventSourceLogger"/> class.
@@ -59,6 +57,7 @@ namespace Microsoft.Extensions.Logging.EventSource
             {
                 throw new ArgumentException("Property bag data format is not supported with .NET Framework 4.5 series", nameof(settings));
             }
+            _eventSource = new EventSourceLoggerEventSource();
 #else
             _eventSource = new System.Diagnostics.Tracing.EventSource(_settings.EventSourceName);
 #endif
@@ -146,14 +145,20 @@ namespace Microsoft.Extensions.Logging.EventSource
         {
             Debug.Assert((_settings.DataFormat & LogDataFormat.PropertyBag) == 0, "Property bag format is not supported with 4.5 framework series");
 
-            string jsonData = GetJsonData(state, exception);
+            string message = messageFormatter(state, exception);
+            string jsonData = GetJsonData(eventId, state, exception);
+
+            switch(logLevel)
+            {
+
+            }
         }
 #endif
         private string GetJsonData<TState>(EventId eventId, TState state, Exception exception)
         {
             if ((_settings.DataFormat & LogDataFormat.JSON) != 0)
             {
-                var data = new { id = eventId.Id, name = eventId.Name, state = state, exception = exception };
+                var data = new { id = eventId.Id, name = eventId.Name, state = state, exception = exception.ToString() };
                 return JsonConvert.SerializeObject(data);
             }
             else

@@ -10,15 +10,12 @@
     },
     "description": "Logger for EventSource infrastructure.",
     "dependencies": {
-        "Microsoft.Extensions.Logging.Abstractions": "1.0.0-*",
-        "Newtonsoft.Json": "8.0.2"
+        "Microsoft.Extensions.Logging.Abstractions": "1.0.0-*", 
+        "Newtonsoft.Json": "8.0.2"   
     },
 
     "frameworks": {
-        "dotnet5.4": {
-            "dependencies": {
-            }
-        },
+        "dotnet5.4": { },
         "net451": { }
     }
 }

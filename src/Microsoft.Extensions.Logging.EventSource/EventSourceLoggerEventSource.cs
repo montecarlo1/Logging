@@ -39,7 +39,7 @@ namespace Microsoft.Extensions.Logging.EventSource.Internal
         }
 
         [Event(InformationalEventId, Level = EventLevel.Informational, Message = "{0}")]
-        public void Informational(string message, string data)
+        public void Information(string message, string data)
         {
             WriteEvent(InformationalEventId, message, data);
         }

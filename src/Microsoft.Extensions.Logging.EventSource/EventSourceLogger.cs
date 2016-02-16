@@ -148,9 +148,35 @@ namespace Microsoft.Extensions.Logging.EventSource
             string message = messageFormatter(state, exception);
             string jsonData = GetJsonData(eventId, state, exception);
 
+            EventSourceLoggerEventSource eventSource = (EventSourceLoggerEventSource)this._eventSource;
+            Debug.Assert(eventSource != null);
+
             switch(logLevel)
             {
+                case LogLevel.Critical:
+                    eventSource.Critical(message, jsonData);
+                    break;
 
+                case LogLevel.Error:
+                    eventSource.Error(message, jsonData);
+                    break;
+
+                case LogLevel.Warning:
+                    eventSource.Warning(message, jsonData);
+                    break;
+
+                case LogLevel.Information:
+                    eventSource.Information(message, jsonData);
+                    break;
+
+                case LogLevel.Debug:
+                case LogLevel.Trace:
+                    eventSource.Verbose(message, jsonData);
+                    break;
+
+                default:
+                    Debug.Fail("Unexpected log level; the event will not be logged");
+                    break;
             }
         }
 #endif
